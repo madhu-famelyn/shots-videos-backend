@@ -15,6 +15,7 @@ class CreatorSchema(BaseModel):
 
 class UserProfileSchema(CreatorSchema):
     email: Optional[str] = ""
+    phone: Optional[str] = ""
     bio: Optional[str] = ""
     following: int = 0
     totalLikes: int = Field(default=0, alias="total_likes")

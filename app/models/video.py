@@ -28,6 +28,8 @@ class Video(Base):
     claps_count = Column(Integer, default=100)
     is_18_plus = Column(Boolean, default=False)
     badge = Column(String, nullable=True)
+    status = Column(String, default="published", index=True)   # draft | published | processing | scheduled | rejected
+    vertical = Column(String, default="entertainment", index=True)  # content vertical slug
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class VideoLike(Base):

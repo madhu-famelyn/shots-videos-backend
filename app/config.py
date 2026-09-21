@@ -13,8 +13,13 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://neondb_owner:npg_6PbepSi8IfxD@ep-lively-darkness-b372v1vf-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+        "postgresql://neondb_owner:npg_6PbepSi8IfxD@ep-lively-darkness-b372v1vf-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
     )
+    # MSG91 OTP Integration
+    MSG91_AUTH_KEY: str = os.getenv("MSG91_AUTH_KEY", "572596A0fiy5sWd6aad138eP1")
+    MSG91_TEMPLATE_ID: str = os.getenv("MSG91_TEMPLATE_ID", "")
+    MSG91_OTP_LENGTH: int = int(os.getenv("MSG91_OTP_LENGTH", "4"))
+
     CORS_ORIGINS: list = [
         "http://localhost:5173",
         "http://localhost:8080",

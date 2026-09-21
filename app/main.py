@@ -2,13 +2,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.seed import seed_database
-from app.routers import auth, shows, videos, categories, comments, users, search, notifications
+from app.database import Base, engine
+from app import models  # noqa: F401 — registers all ORM models with Base.metadata
+from app.routers import auth, shows, videos, categories, comments, users, search, notifications, admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Seed database on launch
-    seed_database()
+    # Only create tables — no dummy data seeding
+    Base.metadata.create_all(bind=engine)
     yield
 
 app = FastAPI(
@@ -35,6 +36,7 @@ app.include_router(comments.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(search.router, prefix=settings.API_V1_STR)
 app.include_router(notifications.router, prefix=settings.API_V1_STR)
+app.include_router(admin.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

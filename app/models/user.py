@@ -17,6 +17,7 @@ class User(Base):
     total_likes = Column(Integer, default=0)
     is_following = Column(Boolean, default=False)
     otp_code = Column(String, nullable=True)
+    verified = Column(Boolean, default=False)          # ← creator verified badge
 
 class Follow(Base):
     __tablename__ = "follows"
