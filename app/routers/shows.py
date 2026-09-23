@@ -4,9 +4,54 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.show import Show
+from app.models.video import Video
 from app.schemas.show import ShowSchema, CastMemberSchema, EpisodeSchema
 
 router = APIRouter(prefix="/shows", tags=["Shows"])
+
+def format_video_as_show(v: Video) -> ShowSchema:
+    vert = (v.vertical or v.category_id or "trending").lower()
+    if vert in ("mature", "18_plus", "18+"):
+        section = "18_plus"
+    elif vert in ("drama", "romance"):
+        section = "drama"
+    elif vert in ("coming_soon", "trailer"):
+        section = "coming_soon"
+    elif vert in ("shorts", "short_serial", "episode", "comedy"):
+        section = "short_serial"
+    elif vert in ("thriller", "action", "crime"):
+        section = "thriller"
+    else:
+        section = "trending"
+
+    return ShowSchema(
+        id=v.id,
+        title=v.title,
+        synopsis=v.description or f"Watch this original Bhojpuri {v.vertical or 'entertainment'} video.",
+        coverImage=v.thumbnail_url or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&h=900&fit=crop",
+        genre=(v.category_name or v.vertical or "Bhojpuri").capitalize(),
+        language=v.language or "भोजपुरी",
+        rating=4.9,
+        totalEpisodes=v.total_episodes or 1,
+        director=v.creator_name or "Echo Reels Studio",
+        cast=[CastMemberSchema(name=v.creator_name or "Creator", role="Creator", avatar=v.creator_avatar or "")],
+        episodes=[EpisodeSchema(
+            id=f"{v.id}_ep1",
+            episodeNumber=v.episode_number or 1,
+            title=v.title,
+            duration=v.duration or 60,
+            thumbnailUrl=v.thumbnail_url or "",
+            videoUrl=v.video_url or "",
+            views=v.views or 0,
+            claps=v.claps_count or 0
+        )],
+        featured=True,
+        is18Plus=v.is_18_plus or False,
+        isComingSoon=False,
+        releaseDate=None,
+        sectionCategory=section,
+        badge=v.badge or "🔥 Trending"
+    )
 
 def format_show(s: Show) -> ShowSchema:
     cast_data = []
@@ -49,28 +94,43 @@ def list_shows(
     featured: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
-    q = db.query(Show)
+    results = []
+    # 1. Any direct Show entries
+    q_shows = db.query(Show)
     if category and category != "all":
-        q = q.filter(Show.section_category == category)
+        q_shows = q_shows.filter(Show.section_category == category)
     if featured is not None:
-        q = q.filter(Show.featured == featured)
-    
-    shows = q.all()
-    return [format_show(s) for s in shows]
+        q_shows = q_shows.filter(Show.featured == featured)
+    for s in q_shows.all():
+        results.append(format_show(s))
+
+    # 2. Uploaded Videos from Admin (only those with a real video_url)
+    q_vids = db.query(Video).filter(Video.status == "published", Video.video_url != "", Video.video_url != None)
+    for v in q_vids.order_by(Video.created_at.desc()).all():
+        show_item = format_video_as_show(v)
+        if category and category != "all" and show_item.sectionCategory != category:
+            continue
+        results.append(show_item)
+
+    return results
 
 @router.get("/trending", response_model=List[ShowSchema])
 def get_trending_shows(db: Session = Depends(get_db)):
-    shows = db.query(Show).filter(Show.section_category == "trending").all()
-    return [format_show(s) for s in shows]
+    return list_shows(category="trending", db=db)
 
 @router.get("/category/{cat_id}", response_model=List[ShowSchema])
 def get_shows_by_category(cat_id: str, db: Session = Depends(get_db)):
-    shows = db.query(Show).filter(Show.section_category == cat_id).all()
-    return [format_show(s) for s in shows]
+    return list_shows(category=cat_id, db=db)
 
 @router.get("/{show_id}", response_model=ShowSchema)
 def get_show(show_id: str, db: Session = Depends(get_db)):
     show = db.query(Show).filter(Show.id == show_id).first()
-    if not show:
-        raise HTTPException(status_code=404, detail="Show not found")
-    return format_show(show)
+    if show:
+        return format_show(show)
+    
+    video = db.query(Video).filter(Video.id == show_id).first()
+    if video:
+        return format_video_as_show(video)
+        
+    raise HTTPException(status_code=404, detail="Content not found")
+

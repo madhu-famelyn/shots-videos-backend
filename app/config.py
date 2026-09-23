@@ -20,6 +20,12 @@ class Settings:
     MSG91_TEMPLATE_ID: str = os.getenv("MSG91_TEMPLATE_ID", "")
     MSG91_OTP_LENGTH: int = int(os.getenv("MSG91_OTP_LENGTH", "4"))
 
+    # Bunny Stream Integration
+    BUNNY_STREAM_LIBRARY_ID: str = os.getenv("BUNNY_STREAM_LIBRARY_ID", "")
+    BUNNY_STREAM_API_KEY: str = os.getenv("BUNNY_STREAM_API_KEY", "")
+    BUNNY_STREAM_CDN_HOSTNAME: str = os.getenv("BUNNY_STREAM_CDN_HOSTNAME", "")
+    BUNNY_STREAM_TOKEN_AUTH_KEY: str = os.getenv("BUNNY_STREAM_TOKEN_AUTH_KEY", "")
+
     CORS_ORIGINS: list = [
         "http://localhost:5173",
         "http://localhost:8080",
@@ -30,3 +36,4 @@ class Settings:
     ]
 
 settings = Settings()
+

@@ -2,6 +2,7 @@
 Admin API Router — /api/admin/*
 All endpoints are open for now (auth can be added later via get_current_user).
 """
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -128,6 +129,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "processingVideos": processing_videos,
         "totalCreators": total_creators,
         "totalUsers": total_users,
+        "totalViews": total_views,
         "watchHours": watch_hours,
         "pendingReports": pending_reports,
         "viewsTrend": views_trend,
@@ -174,24 +176,43 @@ def get_admin_video(video_id: str, db: Session = Depends(get_db)):
 
 @router.post("/videos")
 def create_admin_video(payload: dict, db: Session = Depends(get_db)):
+    raw_video = payload.get("videoUrl") or payload.get("hlsUrl") or payload.get("hls_url") or payload.get("video_url") or ""
+    raw_thumb = payload.get("thumbnailUrl") or payload.get("thumbnail_url") or ""
+
+    # Extract Bunny GUID if present
+    guid_match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", f"{raw_video} {raw_thumb}")
+    if guid_match:
+        guid = guid_match.group(0)
+        video_url = f"https://vz-178c7a7d-b5e.b-cdn.net/{guid}/playlist.m3u8"
+        thumbnail_url = f"https://vz-178c7a7d-b5e.b-cdn.net/{guid}/thumbnail.jpg"
+    else:
+        video_url = raw_video
+        thumbnail_url = raw_thumb
+
+    creator_id = payload.get("creatorId", "admin")
+    creator_name = payload.get("creatorName", "Admin") if creator_id == "admin" else "Admin"
+    u = db.query(User).filter(User.id == creator_id).first()
+    if u:
+        creator_name = u.name or creator_name
+
     video = Video(
         id=str(uuid.uuid4()),
         title=payload.get("title", "Untitled"),
         description=payload.get("description", ""),
-        video_url=payload.get("videoUrl", ""),
-        thumbnail_url=payload.get("thumbnailUrl", ""),
+        video_url=video_url,
+        thumbnail_url=thumbnail_url,
         duration=payload.get("durationSec", 120),
-        creator_id=payload.get("creatorId", "admin"),
-        creator_name=payload.get("creatorName", "Admin"),
-        creator_username=payload.get("creatorUsername", "admin"),
-        category_id=payload.get("vertical", "entertainment"),
-        category_name=payload.get("vertical", "entertainment").capitalize(),
-        language=payload.get("language", "भोजपुरी"),
-        vertical=payload.get("vertical", "entertainment"),
+        creator_id=creator_id,
+        creator_name=creator_name,
+        creator_username=creator_id,
+        category_id=payload.get("vertical", "shorts"),
+        category_name=payload.get("vertical", "shorts").capitalize(),
+        language=payload.get("language", "bho"),
+        vertical=payload.get("vertical", "shorts"),
         is_18_plus=payload.get("mature", False),
-        status=payload.get("status", "draft"),
+        status=payload.get("status", "published"),
         total_episodes=payload.get("episodes", 1),
-        badge=payload.get("badge"),
+        badge=payload.get("badge") or ("🔥 Trending" if payload.get("status") == "published" else None),
     )
     db.add(video)
     db.commit()
@@ -210,8 +231,18 @@ def update_admin_video(video_id: str, payload: dict, db: Session = Depends(get_d
         v.title = payload["title"]
     if "vertical" in payload:
         v.vertical = payload["vertical"]
+        v.category_id = payload["vertical"]
+        v.category_name = payload["vertical"].capitalize()
     if "mature" in payload:
         v.is_18_plus = payload["mature"]
+    if "videoUrl" in payload or "hlsUrl" in payload:
+        raw = payload.get("videoUrl") or payload.get("hlsUrl")
+        guid_match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", raw)
+        if guid_match:
+            v.video_url = f"https://vz-178c7a7d-b5e.b-cdn.net/{guid_match.group(0)}/playlist.m3u8"
+            v.thumbnail_url = f"https://vz-178c7a7d-b5e.b-cdn.net/{guid_match.group(0)}/thumbnail.jpg"
+        else:
+            v.video_url = raw
     db.commit()
     db.refresh(v)
     return _video_dict(v)
@@ -275,23 +306,37 @@ def list_creators(db: Session = Depends(get_db)):
         .all()
     )
     # Look up verified status from users table
-    user_ids = [r.creator_id for r in rows]
+    user_ids = [r.creator_id for r in rows if r.creator_id]
     users_map = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()}
 
-    return [
+    creators_list = [
         {
-            "id": r.creator_id,
-            "name": r.creator_name or "Unknown",
-            "handle": r.creator_username or r.creator_id,
+            "id": r.creator_id or "admin",
+            "name": r.creator_name or "Admin (Echo Reels)",
+            "handle": r.creator_username or "admin",
             "language": "bho",
-            "verified": users_map.get(r.creator_id, User()).verified or False,
-            "followers": users_map.get(r.creator_id, User()).followers or 0,
+            "verified": getattr(users_map.get(r.creator_id), "verified", True) if users_map.get(r.creator_id) else True,
+            "followers": getattr(users_map.get(r.creator_id), "followers", 10000) if users_map.get(r.creator_id) else 10000,
             "videoCount": r.video_count or 0,
             "totalViews": r.total_views or 0,
             "joinedAt": datetime.utcnow().strftime("%Y-%m-%d"),
         }
-        for r in rows
+        for r in rows if r.creator_id
     ]
+    # Always ensure admin is present in the list
+    if not any(c["id"] == "admin" for c in creators_list):
+        creators_list.insert(0, {
+            "id": "admin",
+            "name": "Admin (Echo Reels)",
+            "handle": "admin",
+            "language": "bho",
+            "verified": True,
+            "followers": 25000,
+            "videoCount": len(rows),
+            "totalViews": sum((r.total_views or 0) for r in rows),
+            "joinedAt": datetime.utcnow().strftime("%Y-%m-%d"),
+        })
+    return creators_list
 
 
 @router.patch("/creators/{creator_id}")

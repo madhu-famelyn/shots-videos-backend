@@ -47,8 +47,8 @@ class HistoryEntrySchema(BaseModel):
     watchedAt: str
 
 class TrackEventPayload(BaseModel):
-    event: str
-    progress: float
+    event: Optional[str] = "view"
+    progress: Optional[float] = 0.0
 
 class ReportPayload(BaseModel):
     reason: str
