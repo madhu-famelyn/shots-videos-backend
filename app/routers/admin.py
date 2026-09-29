@@ -50,6 +50,8 @@ def _video_dict(v: Video) -> Dict[str, Any]:
         "views": v.views or 0,
         "likes": v.likes or 0,
         "rating": 4.5,
+        "sectionCategory": getattr(v, "section_category", None) or "trending",
+        "section_category": getattr(v, "section_category", None) or "trending",
         "creatorId": v.creator_id,
         "creatorName": v.creator_name or "Unknown",
         "createdAt": v.created_at.strftime("%Y-%m-%d") if v.created_at else datetime.utcnow().strftime("%Y-%m-%d"),
@@ -211,6 +213,7 @@ def create_admin_video(payload: dict, db: Session = Depends(get_db)):
         vertical=payload.get("vertical", "shorts"),
         is_18_plus=payload.get("mature", False),
         status=payload.get("status", "published"),
+        section_category=payload.get("sectionCategory") or payload.get("section_category") or "trending",
         total_episodes=payload.get("episodes", 1),
         badge=payload.get("badge") or ("🔥 Trending" if payload.get("status") == "published" else None),
     )
@@ -235,6 +238,8 @@ def update_admin_video(video_id: str, payload: dict, db: Session = Depends(get_d
         v.category_name = payload["vertical"].capitalize()
     if "mature" in payload:
         v.is_18_plus = payload["mature"]
+    if "sectionCategory" in payload or "section_category" in payload:
+        v.section_category = payload.get("sectionCategory") or payload.get("section_category")
     if "videoUrl" in payload or "hlsUrl" in payload:
         raw = payload.get("videoUrl") or payload.get("hlsUrl")
         guid_match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", raw)

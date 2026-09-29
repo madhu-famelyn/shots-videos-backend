@@ -30,6 +30,7 @@ class Video(Base):
     badge = Column(String, nullable=True)
     status = Column(String, default="published", index=True)   # draft | published | processing | scheduled | rejected
     vertical = Column(String, default="entertainment", index=True)  # content vertical slug
+    section_category = Column(String, default="trending", index=True)  # trending | drama | 18_plus | coming_soon | short_serial | thriller
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class VideoLike(Base):

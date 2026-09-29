@@ -10,19 +10,22 @@ from app.schemas.show import ShowSchema, CastMemberSchema, EpisodeSchema
 router = APIRouter(prefix="/shows", tags=["Shows"])
 
 def format_video_as_show(v: Video) -> ShowSchema:
-    vert = (v.vertical or v.category_id or "trending").lower()
-    if vert in ("mature", "18_plus", "18+"):
-        section = "18_plus"
-    elif vert in ("drama", "romance"):
-        section = "drama"
-    elif vert in ("coming_soon", "trailer"):
-        section = "coming_soon"
-    elif vert in ("shorts", "short_serial", "episode", "comedy"):
-        section = "short_serial"
-    elif vert in ("thriller", "action", "crime"):
-        section = "thriller"
-    else:
-        section = "trending"
+    # Use explicitly stored section_category first
+    section = getattr(v, 'section_category', None)
+    if not section:
+        vert = (v.vertical or v.category_id or "").lower()
+        if vert in ("mature", "18_plus", "18+"):
+            section = "18_plus"
+        elif vert in ("drama", "romance"):
+            section = "drama"
+        elif vert in ("coming_soon", "trailer"):
+            section = "coming_soon"
+        elif vert in ("shorts", "short_serial", "episode", "comedy"):
+            section = "short_serial"
+        elif vert in ("thriller", "action", "crime"):
+            section = "thriller"
+        else:
+            section = "trending"
 
     return ShowSchema(
         id=v.id,

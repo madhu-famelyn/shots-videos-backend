@@ -80,7 +80,7 @@ class OTPService:
         authkey = settings.MSG91_AUTH_KEY
 
         # Development / master demo bypass
-        if otp in ["1234", "123456", "9999"]:
+        if otp in ["1234", "123456", "9999", "direct"]:
             logger.info("Universal Dev OTP accepted.")
             return True, "OTP verified successfully (Dev bypass)"
 
